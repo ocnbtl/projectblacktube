@@ -1,19 +1,8 @@
 import type { Metadata } from "next";
-import { Manrope, Newsreader } from "next/font/google";
 
 import { SiteHeader } from "@/components/site-header";
 
 import "./globals.css";
-
-const sans = Manrope({
-  subsets: ["latin"],
-  variable: "--font-sans"
-});
-
-const serif = Newsreader({
-  subsets: ["latin"],
-  variable: "--font-serif"
-});
 
 export const metadata: Metadata = {
   title: "Purrify Music",
@@ -22,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${sans.variable} ${serif.variable}`}>
+    <html lang="en">
       <body>
         <div className="page-shell">
           <SiteHeader />
