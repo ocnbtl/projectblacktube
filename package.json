@@ -1,0 +1,20 @@
+{
+  "name": "project-blacktube",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.11.1"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter @blacktube/web dev",
+    "build:web": "pnpm --filter @blacktube/web build",
+    "lint": "pnpm --filter @blacktube/web lint && pnpm --filter @blacktube/shared test",
+    "test": "pnpm --filter @blacktube/shared test",
+    "typecheck": "pnpm --filter @blacktube/web typecheck"
+  }
+}

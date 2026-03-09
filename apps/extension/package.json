@@ -1,0 +1,10 @@
+{
+  "name": "@blacktube/extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "node --check src/service-worker.js && node --check src/popup.js && node --check src/content-script.js"
+  }
+}
+

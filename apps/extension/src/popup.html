@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Purrify Music</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <main class="popup-shell">
+      <section class="top-card">
+        <div class="brand-row">
+          <div class="cat-badge">🐾</div>
+          <div>
+            <p class="eyebrow">Purrify Music</p>
+            <h1>Live control panel</h1>
+          </div>
+        </div>
+        <p id="status-line" class="muted">Checking YouTube Music tab...</p>
+      </section>
+
+      <section class="card">
+        <p class="eyebrow">Current track</p>
+        <div id="track-box" class="track-box">
+          <strong>Open music.youtube.com</strong>
+          <span>Then pin Purrify for quick add.</span>
+        </div>
+        <div class="button-row">
+          <button id="block-song" class="primary-button" type="button">Block song</button>
+          <button id="block-artist" class="secondary-button" type="button">Block artist</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="row-between">
+          <div>
+            <p class="eyebrow">Mode</p>
+            <h2>Autoskip fallback</h2>
+          </div>
+          <div class="mode-row">
+            <button id="mode-autoskip" class="mode-pill" type="button">Autoskip</button>
+            <button id="mode-prompt" class="mode-pill" type="button">Prompt</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="row-between">
+          <div>
+            <p class="eyebrow">Blocklists</p>
+            <h2>Local rules</h2>
+          </div>
+          <button id="new-blocklist" class="ghost-button" type="button">Add list</button>
+        </div>
+        <div id="blocklist-list" class="stack-list"></div>
+      </section>
+
+      <section class="card">
+        <p class="eyebrow">Manual exact rule</p>
+        <div class="field-grid">
+          <label>
+            <span>Blocklist</span>
+            <select id="manual-blocklist"></select>
+          </label>
+          <label>
+            <span>Type</span>
+            <select id="manual-type">
+              <option value="artist">Artist</option>
+              <option value="song">Song</option>
+            </select>
+          </label>
+        </div>
+        <label>
+          <span>Value</span>
+          <input id="manual-value" placeholder="Replay Again - Mia North" />
+        </label>
+        <button id="add-manual-rule" class="primary-button" type="button">Save rule</button>
+      </section>
+
+      <section class="card">
+        <div class="row-between">
+          <div>
+            <p class="eyebrow">Recent events</p>
+            <h2>Last seen actions</h2>
+          </div>
+          <button id="clear-events" class="ghost-button" type="button">Clear</button>
+        </div>
+        <div id="event-list" class="stack-list"></div>
+      </section>
+    </main>
+    <script type="module" src="./popup.js"></script>
+  </body>
+  </html>
+

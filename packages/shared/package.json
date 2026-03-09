@@ -1,0 +1,10 @@
+{
+  "name": "@blacktube/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-transform-types --test tests/*.test.ts"
+  }
+}
+
