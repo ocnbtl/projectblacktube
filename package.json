@@ -10,6 +10,9 @@
   "engines": {
     "node": ">=20.11.1"
   },
+  "devDependencies": {
+    "turbo": "2.7.4"
+  },
   "scripts": {
     "dev:web": "pnpm --filter @blacktube/web dev",
     "build:web": "pnpm --filter @blacktube/web build",
