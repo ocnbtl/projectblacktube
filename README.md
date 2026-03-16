@@ -32,6 +32,7 @@ pnpm install
 ```
 
 3. Copy `.env.example` to `.env.local` and fill the Supabase and Stripe values.
+   Use the new Supabase `publishable` key for browser/client use and the new Supabase `secret` key for privileged server-side use.
 4. Start the web app:
 
 ```bash

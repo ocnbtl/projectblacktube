@@ -22,7 +22,7 @@ This checklist assumes:
 
 ## 4. Supabase
 - Apply `supabase/migrations/20260309120000_initial_schema.sql`.
-- Copy `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`.
+- Copy `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY`.
 - Set Supabase Auth Site URL to `https://purrifymusic.com`.
 - Add redirect URLs for:
   - `https://purrifymusic.com/**`
@@ -53,4 +53,3 @@ This checklist assumes:
 - Confirm sign-in, blocklist CRUD, event logging, billing, and legal pages.
 - Verify production domain, Supabase auth redirects, and Stripe test purchases.
 - Push the first tagged release after the extension and web app are both validated.
-
