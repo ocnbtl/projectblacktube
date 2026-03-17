@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AuthControls } from "./auth-controls";
 import { CatMark } from "./cat-mark";
 
 const links = [
@@ -27,7 +28,8 @@ export function SiteHeader() {
           </Link>
         ))}
       </nav>
+
+      <AuthControls />
     </header>
   );
 }
-

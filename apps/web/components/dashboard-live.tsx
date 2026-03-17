@@ -1,0 +1,504 @@
+"use client";
+
+import { useEffect, useMemo, useState, useTransition } from "react";
+import type { Session } from "@supabase/supabase-js";
+
+import {
+  canAddItemToBlocklist,
+  canCreateBlocklist,
+  getEnabledBlocklistIds,
+  makeArtistItemValue,
+  makeSongItemValue,
+  matchTrackAgainstItems,
+  type BlockItemType,
+  type Blocklist,
+  type TrackSnapshot
+} from "@blacktube/shared";
+
+import { isSupabaseConfigured } from "@/lib/env";
+import { loadDashboardSnapshot, type DashboardSnapshot } from "@/lib/purrify-data";
+import { getBrowserSupabaseClient, signInWithGoogle } from "@/lib/supabase-browser";
+
+const fallbackTracks: TrackSnapshot[] = [
+  {
+    title: "Replay Again",
+    artist: "Mia North"
+  },
+  {
+    title: "Desert Hearts",
+    artist: "Rosaline"
+  },
+  {
+    title: "Anything but Country",
+    artist: "Luke Faux"
+  }
+];
+
+function parseSongEntry(value: string): TrackSnapshot | null {
+  const parts = value.split(" - ").map((part) => part.trim()).filter(Boolean);
+
+  if (parts.length < 2) {
+    return null;
+  }
+
+  return {
+    title: parts[0],
+    artist: parts.slice(1).join(" - ")
+  };
+}
+
+export function DashboardLive() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [ready, setReady] = useState(false);
+  const [loadingData, setLoadingData] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [notice, setNotice] = useState("Sign in to sync live blocklists from Supabase.");
+  const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null);
+  const [selectedListId, setSelectedListId] = useState("");
+  const [entryType, setEntryType] = useState<BlockItemType>("artist");
+  const [entryValue, setEntryValue] = useState("");
+  const [currentTrack, setCurrentTrack] = useState<TrackSnapshot>(fallbackTracks[0]);
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      setReady(true);
+      setErrorMessage("Missing Supabase env. Add the publishable key and URL to continue.");
+      return;
+    }
+
+    const supabase = getBrowserSupabaseClient();
+
+    void supabase.auth.getSession().then(({ data, error }) => {
+      if (error) {
+        setErrorMessage(error.message);
+      } else {
+        setSession(data.session);
+      }
+
+      setReady(true);
+    });
+
+    const {
+      data: { subscription }
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setReady(true);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!session) {
+      setSnapshot(null);
+      return;
+    }
+
+    void refreshSnapshot(session.user.id);
+  }, [session]);
+
+  useEffect(() => {
+    if (!snapshot) {
+      return;
+    }
+
+    const activeList = snapshot.blocklists.find((blocklist) => blocklist.id === selectedListId);
+    if (!activeList) {
+      setSelectedListId(snapshot.blocklists[0]?.id ?? "");
+    }
+
+    const nextTrack = snapshot.suggestions[0] ?? fallbackTracks[0];
+    setCurrentTrack((current) =>
+      current.title === nextTrack.title && current.artist === nextTrack.artist ? current : nextTrack
+    );
+  }, [selectedListId, snapshot]);
+
+  async function refreshSnapshot(userId: string) {
+    setLoadingData(true);
+    setErrorMessage(null);
+
+    try {
+      const data = await loadDashboardSnapshot(getBrowserSupabaseClient(), userId);
+      setSnapshot(data);
+      setNotice("Autoskip rules are live and synced from Supabase.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load your blocklists.";
+      setErrorMessage(message);
+    } finally {
+      setLoadingData(false);
+    }
+  }
+
+  const entitlement = snapshot?.entitlement;
+  const blocklists = snapshot?.blocklists ?? [];
+  const items = snapshot?.items ?? [];
+  const suggestions = snapshot?.suggestions.length ? snapshot.suggestions : fallbackTracks;
+  const enabledIds = useMemo(() => getEnabledBlocklistIds(blocklists), [blocklists]);
+  const match = matchTrackAgainstItems(currentTrack, items, enabledIds);
+  const selectedList = blocklists.find((blocklist) => blocklist.id === selectedListId) ?? blocklists[0];
+  const itemsInSelectedList = items.filter((item) => item.blocklistId === selectedList?.id);
+
+  async function toggleBlocklist(blocklist: Blocklist) {
+    if (!session) {
+      return;
+    }
+
+    startTransition(async () => {
+      const { error } = await getBrowserSupabaseClient()
+        .from("blocklists")
+        .update({ enabled: !blocklist.enabled })
+        .eq("id", blocklist.id);
+
+      if (error) {
+        setErrorMessage(error.message);
+        return;
+      }
+
+      await refreshSnapshot(session.user.id);
+      setNotice(`${blocklist.name} is now ${blocklist.enabled ? "off" : "on"}.`);
+    });
+  }
+
+  async function createBlocklist() {
+    if (!session || !entitlement) {
+      return;
+    }
+
+    if (!canCreateBlocklist(entitlement, blocklists.length)) {
+      setNotice("Your current plan cannot create another blocklist.");
+      return;
+    }
+
+    startTransition(async () => {
+      const name = `New blocklist ${blocklists.length + 1}`;
+      const { error } = await getBrowserSupabaseClient().from("blocklists").insert({
+        user_id: session.user.id,
+        name,
+        enabled: true,
+        sort_order: blocklists.length
+      });
+
+      if (error) {
+        setErrorMessage(error.message);
+        return;
+      }
+
+      await refreshSnapshot(session.user.id);
+      setNotice(`Created ${name}.`);
+    });
+  }
+
+  async function addManualItem() {
+    if (!session || !entitlement || !selectedList) {
+      setNotice("Create or select a blocklist first.");
+      return;
+    }
+
+    if (!canAddItemToBlocklist(entitlement, itemsInSelectedList.length)) {
+      setNotice("This plan has reached its per-blocklist limit.");
+      return;
+    }
+
+    if (!entryValue.trim()) {
+      setNotice("Enter an artist or `Song Title - Artist Name`.");
+      return;
+    }
+
+    let displayValue = entryValue.trim();
+    let normalizedValue = "";
+
+    if (entryType === "artist") {
+      normalizedValue = makeArtistItemValue(displayValue);
+    } else {
+      const parsed = parseSongEntry(entryValue);
+      if (!parsed) {
+        setNotice("Song rules must use `Song Title - Artist Name`.");
+        return;
+      }
+
+      displayValue = `${parsed.title} - ${parsed.artist}`;
+      normalizedValue = makeSongItemValue(parsed);
+    }
+
+    startTransition(async () => {
+      const { error } = await getBrowserSupabaseClient().from("blocklist_items").insert({
+        blocklist_id: selectedList.id,
+        type: entryType,
+        display_value: displayValue,
+        normalized_value: normalizedValue,
+        source: "manual"
+      });
+
+      if (error) {
+        setErrorMessage(error.message);
+        return;
+      }
+
+      setEntryValue("");
+      await refreshSnapshot(session.user.id);
+      setNotice(`Added ${entryType} rule to ${selectedList.name}.`);
+    });
+  }
+
+  async function quickAdd(kind: BlockItemType) {
+    if (!session || !entitlement || !selectedList) {
+      setNotice("Create or select a blocklist first.");
+      return;
+    }
+
+    if (!canAddItemToBlocklist(entitlement, itemsInSelectedList.length)) {
+      setNotice("Upgrade to add more items to this blocklist.");
+      return;
+    }
+
+    const displayValue =
+      kind === "artist" ? currentTrack.artist : `${currentTrack.title} - ${currentTrack.artist}`;
+    const normalizedValue =
+      kind === "artist" ? makeArtistItemValue(currentTrack.artist) : makeSongItemValue(currentTrack);
+
+    startTransition(async () => {
+      const { error } = await getBrowserSupabaseClient().from("blocklist_items").insert({
+        blocklist_id: selectedList.id,
+        type: kind,
+        display_value: displayValue,
+        normalized_value: normalizedValue,
+        source: "current_track"
+      });
+
+      if (error) {
+        setErrorMessage(error.message);
+        return;
+      }
+
+      await refreshSnapshot(session.user.id);
+      setNotice(`Saved the current ${kind} to ${selectedList.name}.`);
+    });
+  }
+
+  if (!ready) {
+    return (
+      <section className="panel">
+        <p className="eyebrow">Dashboard</p>
+        <h2>Checking your session</h2>
+        <p>Loading Purrify account state…</p>
+      </section>
+    );
+  }
+
+  if (!session) {
+    return (
+      <section className="panel auth-panel">
+        <p className="eyebrow">Dashboard</p>
+        <h2>Sign in to create real blocklists</h2>
+        <p>
+          Google auth is ready. Once you sign in, this dashboard will read and write your live
+          Supabase blocklists instead of the scaffold data.
+        </p>
+        <div className="button-row">
+          <button
+            className="primary-button"
+            onClick={() =>
+              startTransition(async () => {
+                setErrorMessage(null);
+                const { error } = await signInWithGoogle();
+                if (error) {
+                  setErrorMessage(error.message);
+                }
+              })
+            }
+            type="button"
+          >
+            {isPending ? "Redirecting…" : "Sign in with Google"}
+          </button>
+        </div>
+        {errorMessage ? <p className="inline-error">{errorMessage}</p> : null}
+      </section>
+    );
+  }
+
+  if (loadingData && !snapshot) {
+    return (
+      <section className="panel">
+        <p className="eyebrow">Dashboard</p>
+        <h2>Loading your blocklists</h2>
+        <p>Fetching entitlements, rules, and recent playback history from Supabase…</p>
+      </section>
+    );
+  }
+
+  if (!snapshot || !entitlement) {
+    return (
+      <section className="panel">
+        <p className="eyebrow">Dashboard</p>
+        <h2>Dashboard data is unavailable</h2>
+        <p>{errorMessage ?? "We could not load your account right now."}</p>
+      </section>
+    );
+  }
+
+  return (
+    <div className="dashboard-grid">
+      <section className="panel spotlight">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">Live status</p>
+            <h2>Current playback match preview</h2>
+          </div>
+          <span className={`status-chip ${match ? "warn" : "ok"}`}>
+            {match ? "Blocked track detected" : "Clear to play"}
+          </span>
+        </div>
+
+        <div className="current-track">
+          <div>
+            <p className="muted">Now previewing</p>
+            <strong>{currentTrack.title}</strong>
+            <p>{currentTrack.artist}</p>
+          </div>
+          <div className="button-row">
+            {suggestions.map((track) => (
+              <button
+                key={`${track.title}-${track.artist}`}
+                className="ghost-button"
+                onClick={() => setCurrentTrack(track)}
+                type="button"
+              >
+                {track.title}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <p className="notice-line">
+          {match
+            ? `This track matches a ${match.item.type} rule and would skip immediately in autoskip mode.`
+            : "No active rule matches this track right now."}
+        </p>
+
+        <div className="button-row">
+          <button className="primary-button" onClick={() => void quickAdd("song")} type="button">
+            Block current song
+          </button>
+          <button className="secondary-button" onClick={() => void quickAdd("artist")} type="button">
+            Block current artist
+          </button>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">Blocklists</p>
+            <h2>Toggle listening modes</h2>
+          </div>
+          <button className="ghost-button" onClick={() => void createBlocklist()} type="button">
+            New blocklist
+          </button>
+        </div>
+
+        <div className="stack-list">
+          {blocklists.length === 0 ? (
+            <div className="empty-card">
+              <strong>No blocklists yet</strong>
+              <p>Create your first blocklist to start saving artists or songs.</p>
+            </div>
+          ) : null}
+          {blocklists.map((blocklist) => {
+            const itemCount = items.filter((item) => item.blocklistId === blocklist.id).length;
+            return (
+              <button
+                key={blocklist.id}
+                className={`list-row ${blocklist.id === selectedListId ? "selected" : ""}`}
+                onClick={() => setSelectedListId(blocklist.id)}
+                type="button"
+              >
+                <div>
+                  <strong>{blocklist.name}</strong>
+                  <p className="muted">{itemCount} rules</p>
+                </div>
+                <label className="toggle" onClick={(event) => event.stopPropagation()}>
+                  <input
+                    checked={blocklist.enabled}
+                    onChange={() => void toggleBlocklist(blocklist)}
+                    type="checkbox"
+                  />
+                  <span>{blocklist.enabled ? "On" : "Off"}</span>
+                </label>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">Manual add</p>
+            <h2>Exact text rules</h2>
+          </div>
+          <span className="muted">
+            {itemsInSelectedList.length}/{entitlement.itemsPerBlocklistLimit ?? "∞"} used
+          </span>
+        </div>
+
+        <div className="form-grid">
+          <label>
+            <span>Blocklist</span>
+            <select value={selectedListId} onChange={(event) => setSelectedListId(event.target.value)}>
+              {blocklists.map((blocklist) => (
+                <option key={blocklist.id} value={blocklist.id}>
+                  {blocklist.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>Type</span>
+            <select value={entryType} onChange={(event) => setEntryType(event.target.value as BlockItemType)}>
+              <option value="artist">Artist</option>
+              <option value="song">Song</option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          <span>{entryType === "artist" ? "Artist name" : "Song Title - Artist Name"}</span>
+          <input
+            onChange={(event) => setEntryValue(event.target.value)}
+            placeholder={entryType === "artist" ? "Luke Faux" : "Replay Again - Mia North"}
+            value={entryValue}
+          />
+        </label>
+
+        <button className="primary-button" onClick={() => void addManualItem()} type="button">
+          Add rule
+        </button>
+        <p className="notice-line">{notice}</p>
+        {errorMessage ? <p className="inline-error">{errorMessage}</p> : null}
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">Suggestions</p>
+            <h2>Seen from your recent history</h2>
+          </div>
+        </div>
+        <div className="pill-grid">
+          {suggestions.map((suggestion) => (
+            <button
+              key={`${suggestion.title}-${suggestion.artist}`}
+              className="pill-button"
+              onClick={() => setEntryValue(`${suggestion.title} - ${suggestion.artist}`)}
+              type="button"
+            >
+              {suggestion.title} <span>{suggestion.artist}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}

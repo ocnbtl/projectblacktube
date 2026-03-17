@@ -1,4 +1,4 @@
-import { DashboardDemo } from "@/components/dashboard-demo";
+import { DashboardLive } from "@/components/dashboard-live";
 
 export default function DashboardPage() {
   return (
@@ -7,13 +7,12 @@ export default function DashboardPage() {
         <p className="eyebrow">Dashboard</p>
         <h1>Blocklists, toggles, and quick-add actions</h1>
         <p>
-          This scaffold demonstrates the main control surface for the MVP: blocklist management,
-          plan-aware limits, current-track actions, and history-driven suggestions.
+          This dashboard now talks to your real Supabase account: blocklist CRUD, plan-aware limits,
+          current-track quick-adds, and history-based suggestions.
         </p>
       </section>
 
-      <DashboardDemo />
+      <DashboardLive />
     </div>
   );
 }
-

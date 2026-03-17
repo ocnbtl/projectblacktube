@@ -271,7 +271,8 @@ select {
 .bar-card-top,
 .current-track,
 .form-grid,
-.pill-grid {
+.pill-grid,
+.auth-status {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
@@ -476,6 +477,39 @@ select {
   gap: 14px;
 }
 
+.auth-status {
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.auth-copy {
+  display: grid;
+  gap: 4px;
+  text-align: right;
+}
+
+.auth-copy strong {
+  font-size: 0.92rem;
+}
+
+.inline-error {
+  margin: 0;
+  color: #8b3a3a;
+}
+
+.auth-panel,
+.empty-card {
+  display: grid;
+  gap: 12px;
+}
+
+.empty-card {
+  padding: 16px;
+  border: 1px dashed rgba(79, 101, 90, 0.24);
+  border-radius: var(--radius-md);
+  background: rgba(255, 253, 248, 0.64);
+}
+
 @media (max-width: 980px) {
   .hero-panel,
   .split-panel,
@@ -489,6 +523,10 @@ select {
     border-radius: 28px;
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .auth-copy {
+    text-align: left;
   }
 }
 
