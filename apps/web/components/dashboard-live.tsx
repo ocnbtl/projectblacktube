@@ -128,6 +128,11 @@ export function DashboardLive() {
   const match = matchTrackAgainstItems(currentTrack, items, enabledIds);
   const selectedList = blocklists.find((blocklist) => blocklist.id === selectedListId) ?? blocklists[0];
   const itemsInSelectedList = items.filter((item) => item.blocklistId === selectedList?.id);
+  const blocklistLimit = entitlement?.blocklistLimit ?? 0;
+  const itemLimit = entitlement?.itemsPerBlocklistLimit ?? null;
+  const blocklistUsageRatio = blocklistLimit ? Math.min(blocklists.length / blocklistLimit, 1) : 0;
+  const itemUsageRatio = itemLimit ? Math.min(itemsInSelectedList.length / itemLimit, 1) : 0;
+  const limitReached = itemLimit !== null && itemsInSelectedList.length >= itemLimit;
 
   async function toggleBlocklist(blocklist: Blocklist) {
     if (!session) {
@@ -253,6 +258,24 @@ export function DashboardLive() {
       setSongArtistEntryValue("");
       await refreshSnapshot(session.user.id);
       setNotice(`Added ${entryType} rule to ${selectedList.name}.`);
+    });
+  }
+
+  async function removeItem(itemId: string) {
+    if (!session) {
+      return;
+    }
+
+    startTransition(async () => {
+      const { error } = await getBrowserSupabaseClient().from("blocklist_items").delete().eq("id", itemId);
+
+      if (error) {
+        setErrorMessage(error.message);
+        return;
+      }
+
+      await refreshSnapshot(session.user.id);
+      setNotice("Rule removed from this blocklist.");
     });
   }
 
@@ -421,28 +444,53 @@ export function DashboardLive() {
               <p>Create your first blocklist to start saving artists or songs.</p>
             </div>
           ) : null}
+          <div className="dashboard-metrics">
+            <div className="metric-chip">
+              <span>Lists used</span>
+              <strong>
+                {blocklists.length}/{blocklistLimit}
+              </strong>
+            </div>
+            <div className="metric-chip">
+              <span>Active now</span>
+              <strong>{enabledIds.size}</strong>
+            </div>
+          </div>
+          <div className="usage-track" aria-hidden="true">
+            <span className="usage-fill sage" style={{ width: `${blocklistUsageRatio * 100}%` }} />
+          </div>
           {blocklists.map((blocklist) => {
             const itemCount = items.filter((item) => item.blocklistId === blocklist.id).length;
             return (
-              <button
-                key={blocklist.id}
-                className={`list-row ${blocklist.id === selectedListId ? "selected" : ""}`}
-                onClick={() => setSelectedListId(blocklist.id)}
-                type="button"
-              >
-                <div>
-                  <strong>{blocklist.name}</strong>
-                  <p className="muted">{itemCount} rules</p>
+              <div key={blocklist.id} className={`list-row ${blocklist.id === selectedListId ? "selected" : ""}`}>
+                <button
+                  className="list-row-main"
+                  onClick={() => setSelectedListId(blocklist.id)}
+                  type="button"
+                >
+                  <div className="list-row-copy">
+                    <strong>{blocklist.name}</strong>
+                    <div className="meta-row">
+                      <span className="meta-pill">{itemCount} rules</span>
+                      <span className={`meta-pill ${blocklist.enabled ? "active" : "idle"}`}>
+                        {blocklist.enabled ? "Listening" : "Paused"}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+                <div className="switch-wrap">
+                  <button
+                    aria-label={`Turn ${blocklist.name} ${blocklist.enabled ? "off" : "on"}`}
+                    aria-pressed={blocklist.enabled}
+                    className={`switch-button ${blocklist.enabled ? "on" : "off"}`}
+                    onClick={() => void toggleBlocklist(blocklist)}
+                    type="button"
+                  >
+                    <span className="switch-thumb" />
+                  </button>
+                  <span className="switch-copy">{blocklist.enabled ? "On" : "Off"}</span>
                 </div>
-                <label className="toggle" onClick={(event) => event.stopPropagation()}>
-                  <input
-                    checked={blocklist.enabled}
-                    onChange={() => void toggleBlocklist(blocklist)}
-                    type="checkbox"
-                  />
-                  <span>{blocklist.enabled ? "On" : "Off"}</span>
-                </label>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -454,9 +502,26 @@ export function DashboardLive() {
             <p className="eyebrow">Manual add</p>
             <h2>Exact text rules</h2>
           </div>
-          <span className="muted">
-            {itemsInSelectedList.length}/{entitlement.itemsPerBlocklistLimit ?? "∞"} used
-          </span>
+          <div className="usage-summary">
+            <strong>
+              {itemsInSelectedList.length}/{itemLimit ?? "∞"} used
+            </strong>
+            <span className="muted">{selectedList ? selectedList.name : "Pick a list first"}</span>
+          </div>
+        </div>
+
+        <div className="usage-card">
+          <div className="usage-copy">
+            <strong>{selectedList ? `${selectedList.name} capacity` : "Choose a blocklist"}</strong>
+            <span>
+              {itemLimit === null
+                ? "Unlimited item slots on this plan."
+                : `${Math.max(itemLimit - itemsInSelectedList.length, 0)} slots left before this list is full.`}
+            </span>
+          </div>
+          <div className="usage-track" aria-hidden="true">
+            <span className="usage-fill warm" style={{ width: `${itemUsageRatio * 100}%` }} />
+          </div>
         </div>
 
         <div className="form-grid">
@@ -528,11 +593,56 @@ export function DashboardLive() {
           </div>
         )}
 
-        <button className="primary-button" onClick={() => void addManualItem()} type="button">
-          Add rule
+        <button
+          className="primary-button"
+          disabled={limitReached || !selectedList}
+          onClick={() => void addManualItem()}
+          type="button"
+        >
+          {limitReached ? "List full" : "Add rule"}
         </button>
         <p className="notice-line">{notice}</p>
         {errorMessage ? <p className="inline-error">{errorMessage}</p> : null}
+
+        <div className="rules-panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Rules</p>
+              <h2>{selectedList ? `Inside ${selectedList.name}` : "Select a blocklist"}</h2>
+            </div>
+            <span className="muted">
+              {itemsInSelectedList.length} saved {itemsInSelectedList.length === 1 ? "rule" : "rules"}
+            </span>
+          </div>
+
+          {itemsInSelectedList.length === 0 ? (
+            <div className="empty-card">
+              <strong>No rules yet</strong>
+              <p>Add an artist or song rule above, or save the current track preview.</p>
+            </div>
+          ) : (
+            <div className="rule-list">
+              {itemsInSelectedList.map((item) => (
+                <div key={item.id} className="rule-card">
+                  <div className="rule-card-copy">
+                    <span className={`meta-pill ${item.type === "song" ? "song" : "artist"}`}>{item.type}</span>
+                    <strong>{item.displayValue}</strong>
+                    <p className="muted">
+                      Added from {item.source === "current_track" ? "current track" : "manual entry"}
+                    </p>
+                  </div>
+                  <button
+                    className="ghost-button"
+                    onClick={() => void removeItem(item.id)}
+                    type="button"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
       <section className="panel">
