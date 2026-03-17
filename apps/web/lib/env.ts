@@ -1,6 +1,4 @@
-function readEnv(name: string): string | undefined {
-  const value = process.env[name];
-
+function normalizeEnvValue(value: string | undefined): string | undefined {
   if (!value) {
     return undefined;
   }
@@ -10,13 +8,13 @@ function readEnv(name: string): string | undefined {
 }
 
 export const env = {
-  appUrl: readEnv("NEXT_PUBLIC_APP_URL") ?? "http://localhost:3000",
-  supportEmail: readEnv("ZOHO_SUPPORT_EMAIL") ?? "hello@purrifymusic.com",
-  supabaseUrl: readEnv("NEXT_PUBLIC_SUPABASE_URL"),
-  supabasePublishableKey: readEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"),
-  supabaseSecretKey: readEnv("SUPABASE_SECRET_KEY"),
-  supabaseProjectId: readEnv("SUPABASE_PROJECT_ID"),
-  extensionSharedSecret: readEnv("EXTENSION_SHARED_SECRET")
+  appUrl: normalizeEnvValue(process.env.NEXT_PUBLIC_APP_URL) ?? "http://localhost:3000",
+  supportEmail: normalizeEnvValue(process.env.ZOHO_SUPPORT_EMAIL) ?? "hello@purrifymusic.com",
+  supabaseUrl: normalizeEnvValue(process.env.NEXT_PUBLIC_SUPABASE_URL),
+  supabasePublishableKey: normalizeEnvValue(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY),
+  supabaseSecretKey: normalizeEnvValue(process.env.SUPABASE_SECRET_KEY),
+  supabaseProjectId: normalizeEnvValue(process.env.SUPABASE_PROJECT_ID),
+  extensionSharedSecret: normalizeEnvValue(process.env.EXTENSION_SHARED_SECRET)
 };
 
 export function isSupabaseConfigured() {
