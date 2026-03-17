@@ -9,6 +9,7 @@ import { loadDashboardSnapshot } from "@/lib/purrify-data";
 import { getBrowserSupabaseClient, signInWithGoogle } from "@/lib/supabase-browser";
 
 export function AnalyticsLive() {
+  const supabaseReady = isSupabaseConfigured();
   const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -30,7 +31,7 @@ export function AnalyticsLive() {
   >([]);
 
   useEffect(() => {
-    if (!isSupabaseConfigured()) {
+    if (!supabaseReady) {
       setReady(true);
       setErrorMessage("Missing Supabase env. Add the publishable key and URL to continue.");
       return;
@@ -56,7 +57,7 @@ export function AnalyticsLive() {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [supabaseReady]);
 
   useEffect(() => {
     if (!session) {
@@ -108,9 +109,12 @@ export function AnalyticsLive() {
         <p className="eyebrow">Analytics</p>
         <h2>Sign in to unlock your account analytics</h2>
         <p>The analytics page now reads recent playback data from Supabase instead of the scaffold samples.</p>
-        <button className="primary-button" onClick={() => void signInWithGoogle()} type="button">
-          Sign in with Google
-        </button>
+        {supabaseReady ? (
+          <button className="primary-button" onClick={() => void signInWithGoogle()} type="button">
+            Sign in with Google
+          </button>
+        ) : null}
+        {errorMessage ? <p className="inline-error">{errorMessage}</p> : null}
       </section>
     );
   }

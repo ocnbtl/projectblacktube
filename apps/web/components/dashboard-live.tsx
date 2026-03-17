@@ -48,6 +48,7 @@ function parseSongEntry(value: string): TrackSnapshot | null {
 }
 
 export function DashboardLive() {
+  const supabaseReady = isSupabaseConfigured();
   const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
@@ -61,7 +62,7 @@ export function DashboardLive() {
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
-    if (!isSupabaseConfigured()) {
+    if (!supabaseReady) {
       setReady(true);
       setErrorMessage("Missing Supabase env. Add the publishable key and URL to continue.");
       return;
@@ -87,7 +88,7 @@ export function DashboardLive() {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [supabaseReady]);
 
   useEffect(() => {
     if (!session) {
@@ -295,23 +296,25 @@ export function DashboardLive() {
           Google auth is ready. Once you sign in, this dashboard will read and write your live
           Supabase blocklists instead of the scaffold data.
         </p>
-        <div className="button-row">
-          <button
-            className="primary-button"
-            onClick={() =>
-              startTransition(async () => {
-                setErrorMessage(null);
-                const { error } = await signInWithGoogle();
-                if (error) {
-                  setErrorMessage(error.message);
-                }
-              })
-            }
-            type="button"
-          >
-            {isPending ? "Redirecting…" : "Sign in with Google"}
-          </button>
-        </div>
+        {supabaseReady ? (
+          <div className="button-row">
+            <button
+              className="primary-button"
+              onClick={() =>
+                startTransition(async () => {
+                  setErrorMessage(null);
+                  const { error } = await signInWithGoogle();
+                  if (error) {
+                    setErrorMessage(error.message);
+                  }
+                })
+              }
+              type="button"
+            >
+              {isPending ? "Redirecting…" : "Sign in with Google"}
+            </button>
+          </div>
+        ) : null}
         {errorMessage ? <p className="inline-error">{errorMessage}</p> : null}
       </section>
     );
