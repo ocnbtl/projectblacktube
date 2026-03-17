@@ -34,19 +34,6 @@ const fallbackTracks: TrackSnapshot[] = [
   }
 ];
 
-function parseSongEntry(value: string): TrackSnapshot | null {
-  const parts = value.split(" - ").map((part) => part.trim()).filter(Boolean);
-
-  if (parts.length < 2) {
-    return null;
-  }
-
-  return {
-    title: parts[0],
-    artist: parts.slice(1).join(" - ")
-  };
-}
-
 export function DashboardLive() {
   const supabaseReady = isSupabaseConfigured();
   const [session, setSession] = useState<Session | null>(null);
@@ -57,7 +44,9 @@ export function DashboardLive() {
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null);
   const [selectedListId, setSelectedListId] = useState("");
   const [entryType, setEntryType] = useState<BlockItemType>("artist");
-  const [entryValue, setEntryValue] = useState("");
+  const [artistEntryValue, setArtistEntryValue] = useState("");
+  const [songTitleEntryValue, setSongTitleEntryValue] = useState("");
+  const [songArtistEntryValue, setSongArtistEntryValue] = useState("");
   const [currentTrack, setCurrentTrack] = useState<TrackSnapshot>(fallbackTracks[0]);
   const [isPending, startTransition] = useTransition();
 
@@ -201,33 +190,57 @@ export function DashboardLive() {
       return;
     }
 
-    if (!entryValue.trim()) {
-      setNotice("Enter an artist or `Song Title - Artist Name`.");
-      return;
-    }
-
-    let displayValue = entryValue.trim();
-    let normalizedValue = "";
-
     if (entryType === "artist") {
-      normalizedValue = makeArtistItemValue(displayValue);
-    } else {
-      const parsed = parseSongEntry(entryValue);
-      if (!parsed) {
-        setNotice("Song rules must use `Song Title - Artist Name`.");
+      const artistValue = artistEntryValue.trim();
+
+      if (!artistValue) {
+        setNotice("Enter an artist name.");
         return;
       }
 
-      displayValue = `${parsed.title} - ${parsed.artist}`;
-      normalizedValue = makeSongItemValue(parsed);
+      const normalizedValue = makeArtistItemValue(artistValue);
+
+      startTransition(async () => {
+        const { error } = await getBrowserSupabaseClient().from("blocklist_items").insert({
+          blocklist_id: selectedList.id,
+          type: entryType,
+          display_value: artistValue,
+          normalized_value: normalizedValue,
+          source: "manual"
+        });
+
+        if (error) {
+          setErrorMessage(error.message);
+          return;
+        }
+
+        setArtistEntryValue("");
+        await refreshSnapshot(session.user.id);
+        setNotice(`Added ${entryType} rule to ${selectedList.name}.`);
+      });
+
+      return;
     }
+
+    const songTitle = songTitleEntryValue.trim();
+    const songArtist = songArtistEntryValue.trim();
+
+    if (!songTitle || !songArtist) {
+      setNotice("Enter both the song title and artist name.");
+      return;
+    }
+
+    const parsedTrack: TrackSnapshot = {
+      title: songTitle,
+      artist: songArtist
+    };
 
     startTransition(async () => {
       const { error } = await getBrowserSupabaseClient().from("blocklist_items").insert({
         blocklist_id: selectedList.id,
         type: entryType,
-        display_value: displayValue,
-        normalized_value: normalizedValue,
+        display_value: `${parsedTrack.title} - ${parsedTrack.artist}`,
+        normalized_value: makeSongItemValue(parsedTrack),
         source: "manual"
       });
 
@@ -236,7 +249,8 @@ export function DashboardLive() {
         return;
       }
 
-      setEntryValue("");
+      setSongTitleEntryValue("");
+      setSongArtistEntryValue("");
       await refreshSnapshot(session.user.id);
       setNotice(`Added ${entryType} rule to ${selectedList.name}.`);
     });
@@ -457,23 +471,62 @@ export function DashboardLive() {
             </select>
           </label>
 
-          <label>
-            <span>Type</span>
-            <select value={entryType} onChange={(event) => setEntryType(event.target.value as BlockItemType)}>
-              <option value="artist">Artist</option>
-              <option value="song">Song</option>
-            </select>
-          </label>
+          <div className="field-stack">
+            <span className="field-label">Type</span>
+            <div className="type-toggle" role="tablist" aria-label="Rule type">
+              <span className={`type-toggle-pill ${entryType === "song" ? "song" : "artist"}`} />
+              <button
+                aria-selected={entryType === "artist"}
+                className={`type-toggle-option ${entryType === "artist" ? "active" : ""}`}
+                onClick={() => setEntryType("artist")}
+                role="tab"
+                type="button"
+              >
+                Artist
+              </button>
+              <button
+                aria-selected={entryType === "song"}
+                className={`type-toggle-option ${entryType === "song" ? "active" : ""}`}
+                onClick={() => setEntryType("song")}
+                role="tab"
+                type="button"
+              >
+                Song
+              </button>
+            </div>
+          </div>
         </div>
 
-        <label>
-          <span>{entryType === "artist" ? "Artist name" : "Song Title - Artist Name"}</span>
-          <input
-            onChange={(event) => setEntryValue(event.target.value)}
-            placeholder={entryType === "artist" ? "Luke Faux" : "Replay Again - Mia North"}
-            value={entryValue}
-          />
-        </label>
+        {entryType === "artist" ? (
+          <label>
+            <span>Artist name</span>
+            <input
+              onChange={(event) => setArtistEntryValue(event.target.value)}
+              placeholder="Luke Faux"
+              value={artistEntryValue}
+            />
+          </label>
+        ) : (
+          <div className="form-grid">
+            <label>
+              <span>Song title</span>
+              <input
+                onChange={(event) => setSongTitleEntryValue(event.target.value)}
+                placeholder="Replay Again"
+                value={songTitleEntryValue}
+              />
+            </label>
+
+            <label>
+              <span>Song artist</span>
+              <input
+                onChange={(event) => setSongArtistEntryValue(event.target.value)}
+                placeholder="Mia North"
+                value={songArtistEntryValue}
+              />
+            </label>
+          </div>
+        )}
 
         <button className="primary-button" onClick={() => void addManualItem()} type="button">
           Add rule
@@ -494,7 +547,11 @@ export function DashboardLive() {
             <button
               key={`${suggestion.title}-${suggestion.artist}`}
               className="pill-button"
-              onClick={() => setEntryValue(`${suggestion.title} - ${suggestion.artist}`)}
+              onClick={() => {
+                setEntryType("song");
+                setSongTitleEntryValue(suggestion.title);
+                setSongArtistEntryValue(suggestion.artist);
+              }}
               type="button"
             >
               {suggestion.title} <span>{suggestion.artist}</span>

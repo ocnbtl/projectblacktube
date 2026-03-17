@@ -28,5 +28,6 @@
 - Chrome-only.
 - English-first.
 - Autoskip is primary; prompt mode exists as a safety fallback.
-- Manual search uses exact text plus suggestions from already-seen listening history.
-
+- Manual rule entry uses exact text plus suggestions from already-seen listening history.
+- Artist rules use a single artist field.
+- Song rules use separate song-title and artist fields so duplicate song names can still be matched precisely.

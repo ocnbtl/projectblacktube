@@ -49,6 +49,10 @@ select {
   font: inherit;
 }
 
+button {
+  appearance: none;
+}
+
 .page-shell {
   width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
@@ -390,9 +394,15 @@ label {
   gap: 8px;
 }
 
-label span {
+label span,
+.field-label {
   font-size: 0.92rem;
   font-weight: 700;
+}
+
+.field-stack {
+  display: grid;
+  gap: 8px;
 }
 
 input,
@@ -404,6 +414,57 @@ select {
   background: rgba(255, 253, 248, 0.86);
   padding: 0 14px;
   color: var(--text);
+}
+
+.type-toggle {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 6px;
+  border-radius: 18px;
+  border: 1px solid rgba(79, 101, 90, 0.16);
+  background:
+    linear-gradient(180deg, rgba(153, 181, 161, 0.1), rgba(255, 253, 248, 0.86)),
+    rgba(255, 253, 248, 0.7);
+  overflow: hidden;
+}
+
+.type-toggle-pill {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: calc(50% - 6px);
+  height: calc(100% - 12px);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(39, 48, 43, 0.95), rgba(79, 101, 90, 0.9));
+  box-shadow: 0 10px 24px rgba(39, 48, 43, 0.14);
+  transition:
+    transform 220ms cubic-bezier(0.2, 0.9, 0.2, 1),
+    background 220ms ease;
+}
+
+.type-toggle-pill.song {
+  transform: translateX(calc(100% + 6px));
+  background: linear-gradient(135deg, rgba(192, 139, 139, 0.95), rgba(215, 178, 107, 0.88));
+}
+
+.type-toggle-option {
+  position: relative;
+  z-index: 1;
+  min-height: 50px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+.type-toggle-option.active {
+  color: white;
+}
+
+.type-toggle-option:hover {
+  transform: translateY(-1px);
 }
 
 .pill-grid {

@@ -49,4 +49,5 @@ pnpm dev:web
 - Connect the web dashboard to a live Supabase project.
 - Add Stripe webhook secrets and verify entitlement sync.
 - Load the extension against `music.youtube.com` and verify selectors on real playback flows.
-- Replace demo data in the web app with authenticated queries and mutations.
+- Replace the remaining marketing/demo placeholders with fully account-backed data.
+- Refine the dashboard rule-entry UX with animated type toggles and explicit song-title plus artist inputs.
